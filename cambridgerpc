@@ -1,0 +1,169 @@
+import discord
+from discord.ext import commands
+
+# =============================
+# CONFIG
+# =============================
+GUILD_ID = 1411762012756774984
+CATEGORY_ID = 1411969504207962133
+STAFF_ROLE_ID = 1411969665881604156
+EMBED_COLOR = 0x2f3136
+PREFIX = "?"
+TOKEN = "NA"  # replace with your token
+
+# =============================
+# BOT SETUP
+# =============================
+intents = discord.Intents.default()
+intents.messages = True
+intents.guilds = True
+intents.members = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+# =============================
+# HELPERS
+# =============================
+async def send_ticket_embed(channel, title, description):
+    embed = discord.Embed(title=title, description=description, color=EMBED_COLOR)
+    await channel.send(embed=embed)
+
+# =============================
+# DM HANDLER
+# =============================
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+
+    # Handle prefix commands normally
+    if message.content.startswith(PREFIX):
+        ctx = await bot.get_context(message)
+        # Support multi-alias execution (?close ?hi)
+        parts = message.content.split()
+        for part in parts:
+            if part.startswith(PREFIX):
+                alias = part[len(PREFIX):]
+                command = bot.get_command(alias)
+                if command:
+                    await bot.invoke(await bot.get_context(message, cls=type(ctx)))
+        return
+
+    # DM handling
+    if isinstance(message.channel, discord.DMChannel):
+        embed = discord.Embed(
+            title="Thank you for contacting Cambridge RPC.",
+            description="Please choose from the dropdown.",
+            color=EMBED_COLOR,
+        )
+
+        view = discord.ui.View(timeout=None)
+
+        async def dropdown_callback(interaction: discord.Interaction):
+            if interaction.values[0] == "general":
+                await interaction.response.send_message(
+                    embed=discord.Embed(
+                        title="General Enquiry Ticket",
+                        description="Thank you for opening a general enquiry ticket.\n\nPlease write what you need below!",
+                        color=EMBED_COLOR,
+                    ),
+                    ephemeral=False,
+                )
+
+            elif interaction.values[0] == "employment":
+                await interaction.response.send_message(
+                    embed=discord.Embed(
+                        title="Employment Ticket",
+                        description=(
+                            "Thank you for opening an employment ticket.\n"
+                            "Use the format below to apply:\n\n"
+                            "**Full Name:**\n"
+                            "**Roblox User:**\n"
+                            "**Role Reference:**\n"
+                            "**Do You Have a Mic:**\n"
+                            "**Do You Have Experience:**"
+                        ),
+                        color=EMBED_COLOR,
+                    ),
+                    ephemeral=False,
+                )
+
+            elif interaction.values[0] == "staff":
+                await interaction.response.send_message(
+                    embed=discord.Embed(
+                        title="Staff Report Ticket",
+                        description=(
+                            "Thank you for opening a staff report ticket.\n"
+                            "Use the format below to report:\n\n"
+                            "**Officer Pin:**\n"
+                            "**Reason for Report:**\n"
+                            "**Evidence:**"
+                        ),
+                        color=EMBED_COLOR,
+                    ),
+                    ephemeral=False,
+                )
+
+        select = discord.ui.Select(
+            placeholder="Choose an option...",
+            options=[
+                discord.SelectOption(label="General Enquiry", value="general"),
+                discord.SelectOption(label="Employments", value="employment"),
+                discord.SelectOption(label="Staff Reports", value="staff"),
+            ],
+        )
+        select.callback = dropdown_callback
+        view.add_item(select)
+
+        await message.channel.send(embed=embed, view=view)
+
+# =============================
+# COMMANDS
+# =============================
+@bot.command(name="alias")
+async def alias(ctx):
+    cmds = ["hi", "end", "close", "contact <userid>"]
+    embed = discord.Embed(
+        title="Available Aliases",
+        description="\n".join([f"`?{c}`" for c in cmds]),
+        color=EMBED_COLOR,
+    )
+    await ctx.send(embed=embed)
+
+@bot.command(name="hi", aliases=["hello"])
+async def hi(ctx):
+    await send_ticket_embed(ctx.channel, "Hello!", "Hello and thank you for opening a ticket.\n\nPlease write what you need below.")
+
+@bot.command(name="end", aliases=["bye"])
+async def end(ctx):
+    await send_ticket_embed(ctx.channel, "End Ticket", "Thank you for opening a ticket, DM back if you need help.")
+    await ctx.channel.delete()
+
+@bot.command(name="close", aliases=["finish"])
+async def close(ctx):
+    embed = discord.Embed(
+        title="Ticket Closed",
+        description=f"This modmail has been closed by {ctx.author.mention}.",
+        color=EMBED_COLOR,
+    )
+    await ctx.send(embed=embed)
+    await ctx.channel.delete()
+
+@bot.command(name="contact")
+async def contact(ctx, user: discord.User):
+    embed = discord.Embed(
+        title="Modmail Opened",
+        description=f"This modmail has been opened by {ctx.author.mention}.",
+        color=EMBED_COLOR,
+    )
+    try:
+        await user.send(embed=embed)
+        await ctx.send(f"Opened modmail with {user.mention}.")
+    except discord.Forbidden:
+        await ctx.send("Could not DM this user.")
+
+# =============================
+# RUN BOT
+# =============================
+bot.run(TOKEN)
